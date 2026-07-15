@@ -1,4 +1,4 @@
-﻿import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     kotlin("jvm") version "2.3.0"
@@ -6,7 +6,7 @@ plugins {
     id("java-library")
     id("maven-publish")
     id("com.gradleup.shadow") version "9.3.1"
-    id("com.willfp.libreforge-gradle-plugin") version "2.0.1"
+    id("com.willfp.libreforge-gradle-plugin") version "2.0.0"
 }
 
 group = "com.willfp"
@@ -15,13 +15,17 @@ val libreforgeVersion = findProperty("libreforge-version")
 val ecoVersion = findProperty("eco-version")
 
 base {
-    archivesName.set(if (project.hasProperty("free")) "${project.name}-Free" else project.name)
+    archivesName.set(project.name)
 }
 
 dependencies {
-    project.project(project(":eco-core").path).subprojects {
-        implementation(this)
-    }
+    implementation(project(":eco-core:core-plugin"))
+    implementation(project(":eco-core:core-nms:v1_21_8", configuration = "reobf"))
+    implementation(project(":eco-core:core-nms:v1_21_10", configuration = "reobf"))
+    implementation(project(":eco-core:core-nms:v1_21_11", configuration = "reobf"))
+    implementation(project(":eco-core:core-nms:v26_1_1", configuration = "shadow"))
+    implementation(project(":eco-core:core-nms:v26_1_2", configuration = "shadow"))
+    implementation(project(":eco-core:core-nms:v26_2", configuration = "shadow"))
 }
 
 java {
@@ -30,13 +34,11 @@ java {
 
 publishing {
     publications {
-        // maven-private: only the shaded jar
         create<MavenPublication>("private") {
-            artifactId = if (project.hasProperty("free")) "${rootProject.name}-Free" else rootProject.name
+            artifactId = rootProject.name
         }
-        // maven-releases + GitHub: full set (none, all, sources, javadoc)
         create<MavenPublication>("release") {
-            artifactId = if (project.hasProperty("free")) "${rootProject.name}-Free" else rootProject.name
+            artifactId = rootProject.name
             from(components["java"])
         }
     }
@@ -69,6 +71,7 @@ afterEvaluate {
 tasks.matching { it.name.startsWith("generatePomFileFor") }.configureEach {
     mustRunAfter(tasks.named("clean"))
 }
+
 tasks.register("publishToAuxilor") {
     dependsOn(
         "publishPrivatePublicationToAuxilorRepository",
@@ -85,32 +88,35 @@ allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
-
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://repo.auxilor.io/repository/maven-public/")
-        maven("https://jitpack.io")
+        maven("https://hub.spigotmc.org/nexus/content/repositories/snapshots/")
+        maven("https://repo.codemc.org/repository/nms/")
+        maven("https://repo.essentialsx.net/releases/")
+        maven("https://jitpack.io") {
+            content { includeGroupByRegex("com\\.github\\..*") }
+        }
     }
 
     dependencies {
+        implementation("com.willfp:libreforge:$libreforgeVersion") {
+            isTransitive = false
+        }
         compileOnly("com.willfp:eco:$ecoVersion")
         compileOnly("org.jetbrains:annotations:26.0.2")
         compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
         compileOnly("com.github.ben-manes.caffeine:caffeine:3.2.3")
     }
 
-    java {
-        withSourcesJar()
-        toolchain.languageVersion.set(JavaLanguageVersion.of(21))
-    }
-
     tasks {
         shadowJar {
             exclude("META-INF/**")
-            relocate("com.willfp.libreforge.loader", "com.willfp.ecoitems.libreforge.loader")
+            relocate("com.willfp.libreforge", "com.willfp.ecoitems.libs.libreforge")
             relocate("kotlin", "com.willfp.eco.libs.kotlin")
             relocate("kotlin.jvm", "com.willfp.eco.libs.kotlin.jvm")
             relocate("kotlin.coroutines", "com.willfp.eco.libs.kotlin.coroutines")
             relocate("kotlin.reflect", "com.willfp.eco.libs.kotlin.reflect")
+            relocate("com.github.benmanes.caffeine", "com.willfp.eco.libs.caffeine")
         }
 
         compileKotlin {
@@ -122,7 +128,6 @@ allprojects {
         compileJava {
             options.isDeprecation = true
             options.encoding = "UTF-8"
-
             dependsOn(clean)
         }
 
@@ -138,6 +143,17 @@ allprojects {
 
         build {
             dependsOn(shadowJar)
+        }
+
+        withType<JavaCompile>().configureEach {
+            options.release = 21
+        }
+    }
+
+    java {
+        withSourcesJar()
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
         }
     }
 }
