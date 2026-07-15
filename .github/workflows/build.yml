@@ -6,7 +6,7 @@ on:
       - '**/*.kt'
       - '**/*.kts'
   push:
-    branches:
+分支:
       - master
     paths:
       - '**/*.kt'
@@ -32,3 +32,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       - name: Build
         run: ./gradlew build --full-stacktrace
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: build/libs
+          retention-days: 7
