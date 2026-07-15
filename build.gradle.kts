@@ -26,6 +26,11 @@ dependencies {
     implementation(project(":eco-core:core-nms:v26_1_1", configuration = "shadow"))
     implementation(project(":eco-core:core-nms:v26_1_2", configuration = "shadow"))
     implementation(project(":eco-core:core-nms:v26_2", configuration = "shadow"))
+    
+    // ⭐ 唯一修改：将 Libreforge 从 compileOnly 改为 implementation
+    implementation("com.willfp:libreforge:$libreforgeVersion") {
+        isTransitive = false
+    }
 }
 
 java {
@@ -34,9 +39,11 @@ java {
 
 publishing {
     publications {
+        // maven-private: only the shaded jar
         create<MavenPublication>("private") {
             artifactId = rootProject.name
         }
+        // maven-releases + GitHub: full set (none, all, sources, javadoc)
         create<MavenPublication>("release") {
             artifactId = rootProject.name
             from(components["java"])
@@ -71,7 +78,6 @@ afterEvaluate {
 tasks.matching { it.name.startsWith("generatePomFileFor") }.configureEach {
     mustRunAfter(tasks.named("clean"))
 }
-
 tasks.register("publishToAuxilor") {
     dependsOn(
         "publishPrivatePublicationToAuxilorRepository",
@@ -88,6 +94,7 @@ allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
+
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://repo.auxilor.io/repository/maven-public/")
         maven("https://hub.spigotmc.org/nexus/content/repositories/snapshots/")
@@ -99,9 +106,6 @@ allprojects {
     }
 
     dependencies {
-        implementation("com.willfp:libreforge:$libreforgeVersion") {
-            isTransitive = false
-        }
         compileOnly("com.willfp:eco:$ecoVersion")
         compileOnly("org.jetbrains:annotations:26.0.2")
         compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
@@ -111,12 +115,11 @@ allprojects {
     tasks {
         shadowJar {
             exclude("META-INF/**")
-            relocate("com.willfp.libreforge", "com.willfp.ecoitems.libs.libreforge")
+            relocate("com.willfp.libreforge.loader", "com.willfp.ecoenchants.libreforge.loader")
             relocate("kotlin", "com.willfp.eco.libs.kotlin")
             relocate("kotlin.jvm", "com.willfp.eco.libs.kotlin.jvm")
             relocate("kotlin.coroutines", "com.willfp.eco.libs.kotlin.coroutines")
             relocate("kotlin.reflect", "com.willfp.eco.libs.kotlin.reflect")
-            relocate("com.github.benmanes.caffeine", "com.willfp.eco.libs.caffeine")
         }
 
         compileKotlin {
@@ -128,6 +131,7 @@ allprojects {
         compileJava {
             options.isDeprecation = true
             options.encoding = "UTF-8"
+
             dependsOn(clean)
         }
 
