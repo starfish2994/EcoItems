@@ -6,7 +6,7 @@ plugins {
     id("java-library")
     id("maven-publish")
     id("com.gradleup.shadow") version "9.3.1"
-    id("com.willfp.libreforge-gradle-plugin") version "2.0.0"
+    id("com.willfp.libreforge-gradle-plugin") version "2.0.1"
 }
 
 group = "com.willfp"
@@ -15,19 +15,14 @@ val libreforgeVersion = findProperty("libreforge-version")
 val ecoVersion = findProperty("eco-version")
 
 base {
-    archivesName.set(project.name)
+    archivesName.set(if (project.hasProperty("free")) "${project.name}-Free" else project.name)
 }
 
 dependencies {
-    implementation(project(":eco-core:core-plugin"))
-    implementation(project(":eco-core:core-nms:v1_21_8", configuration = "reobf"))
-    implementation(project(":eco-core:core-nms:v1_21_10", configuration = "reobf"))
-    implementation(project(":eco-core:core-nms:v1_21_11", configuration = "reobf"))
-    implementation(project(":eco-core:core-nms:v26_1_1", configuration = "shadow"))
-    implementation(project(":eco-core:core-nms:v26_1_2", configuration = "shadow"))
-    implementation(project(":eco-core:core-nms:v26_2", configuration = "shadow"))
+    project.project(project(":eco-core").path).subprojects {
+        implementation(this)
+    }
     
-    // ⭐ 唯一修改：将 Libreforge 从 compileOnly 改为 implementation
     implementation("com.willfp:libreforge:$libreforgeVersion") {
         isTransitive = false
     }
@@ -41,11 +36,11 @@ publishing {
     publications {
         // maven-private: only the shaded jar
         create<MavenPublication>("private") {
-            artifactId = rootProject.name
+            artifactId = if (project.hasProperty("free")) "${rootProject.name}-Free" else rootProject.name
         }
         // maven-releases + GitHub: full set (none, all, sources, javadoc)
         create<MavenPublication>("release") {
-            artifactId = rootProject.name
+            artifactId = if (project.hasProperty("free")) "${rootProject.name}-Free" else rootProject.name
             from(components["java"])
         }
     }
@@ -97,12 +92,7 @@ allprojects {
 
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://repo.auxilor.io/repository/maven-public/")
-        maven("https://hub.spigotmc.org/nexus/content/repositories/snapshots/")
-        maven("https://repo.codemc.org/repository/nms/")
-        maven("https://repo.essentialsx.net/releases/")
-        maven("https://jitpack.io") {
-            content { includeGroupByRegex("com\\.github\\..*") }
-        }
+        maven("https://jitpack.io")
     }
 
     dependencies {
@@ -112,10 +102,15 @@ allprojects {
         compileOnly("com.github.ben-manes.caffeine:caffeine:3.2.3")
     }
 
+    java {
+        withSourcesJar()
+        toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    }
+
     tasks {
         shadowJar {
             exclude("META-INF/**")
-            relocate("com.willfp.libreforge.loader", "com.willfp.ecoenchants.libreforge.loader")
+            relocate("com.willfp.libreforge.loader", "com.willfp.ecoitems.libreforge.loader")
             relocate("kotlin", "com.willfp.eco.libs.kotlin")
             relocate("kotlin.jvm", "com.willfp.eco.libs.kotlin.jvm")
             relocate("kotlin.coroutines", "com.willfp.eco.libs.kotlin.coroutines")
@@ -147,17 +142,6 @@ allprojects {
 
         build {
             dependsOn(shadowJar)
-        }
-
-        withType<JavaCompile>().configureEach {
-            options.release = 21
-        }
-    }
-
-    java {
-        withSourcesJar()
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(25)
         }
     }
 }
